@@ -1,0 +1,36 @@
+body {
+    background: #38408c;
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.token-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Align to the left */
+    /* padding: 20px; */
+}
+
+.token {
+    background-color: #1e233d;
+    border-radius: 8px;
+    padding: 20px 30px; /* Increased padding */
+    /* margin: 10px; */
+    width: 300px; /* Increased width */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.token-name {
+    font-weight: bold;
+    font-size: 1.5em; /* Increased font size */
+}
+
+.token-code {
+    color: #f00;
+    font-weight: bold;
+    font-size: 1.5em; /* Increased font size */
+}

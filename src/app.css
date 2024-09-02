@@ -5,6 +5,7 @@ body {
     margin: 0;
     padding: 0;
     font-size: 1.5em;
+    font-weight: bold;
     text-align: center;
 }
 
@@ -18,7 +19,13 @@ header, main {
 }
 
 header {
-    height: 180px; background: #2f355f; padding: 1px;
+    height: 175px; background: #2f355f; padding: 1px;
+}
+
+header label {
+    display: block;
+    padding-left: 45px;
+    text-align: left;
 }
 
 h1,  h2, h3, h4, h5 {

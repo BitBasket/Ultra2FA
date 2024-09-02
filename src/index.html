@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultra2FA: TOTP on all of your devices!</title>
     <link rel="stylesheet" href="app.css"/>
+    <link rel="stylesheet" href="export.css"/>
 </head>
 <body>
     <header>
@@ -17,7 +18,33 @@
     <main>
         <section id="tokens" class="token-container">
         </section>
+        <section id="controls">
+            <button id="export-btn">Export</button>
+            <div id="passkey-popup-overlay"></div>
+
+            <div id="passkey-popup">
+                <form id="passkey-form">
+                    <label for="passkey">Enter your passkey:</label>
+                    <input type="password" id="passkey" name="passkey" required>
+                    <button type="submit">Submit</button>
+                </form>
+            </div>
+
+            <div id="file-upload-popup-overlay"></div>
+
+            <div id="file-upload-popup">
+                <form id="file-upload-form">
+                    <label for="file-upload">Upload your encrypted 2FA secrets file:</label>
+                    <input type="file" id="file-upload" name="file-upload" accept=".aes" required>
+                    <button type="submit">Upload</button>
+                </form>
+            </div>
+        </section>
     </main>
+    <footer>
+
+    </footer>
     <script type="module" src="./main.js"></script>
+    <script type="module" src="./export.js"></script>
 </body>
 </html>

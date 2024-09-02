@@ -15,7 +15,7 @@ input, select, textarea, button {
 }
 
 header, main {
-    width: 444px;
+    max-width: 480px;
 }
 
 header {
@@ -44,7 +44,7 @@ h1,  h2, h3, h4, h5 {
     border-radius: 8px;
     padding: 20px 30px; /* Increased padding */
     margin: 3px 0;
-    width: 385px; /* Increased width */
+    width: calc(100% - 60px); /* Increased width */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -57,4 +57,5 @@ h1,  h2, h3, h4, h5 {
 .token-code {
     color: #f00;
     font-weight: bold;
+    padding-left: 10px;
 }

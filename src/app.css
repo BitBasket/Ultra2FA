@@ -4,6 +4,25 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    font-size: 1.5em;
+    text-align: center;
+}
+
+input, select, textarea, button {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+header, main {
+    width: 444px;
+}
+
+header {
+    height: 180px; background: #2f355f; padding: 1px;
+}
+
+h1,  h2, h3, h4, h5 {
+    margin-bottom: 18px;
 }
 
 .token-container {
@@ -17,8 +36,8 @@ body {
     background-color: #1e233d;
     border-radius: 8px;
     padding: 20px 30px; /* Increased padding */
-    /* margin: 10px; */
-    width: 300px; /* Increased width */
+    margin: 3px 0;
+    width: 385px; /* Increased width */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -26,11 +45,9 @@ body {
 
 .token-name {
     font-weight: bold;
-    font-size: 1.5em; /* Increased font size */
 }
 
 .token-code {
     color: #f00;
     font-weight: bold;
-    font-size: 1.5em; /* Increased font size */
 }

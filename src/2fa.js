@@ -38,7 +38,7 @@ function download2FA()
     return [
         { "a": "aa", "s":"AAAAAAAAAAAAAAAAA" },
         { "a": "bb", "s":"IIIIIIIIIIIIIIIIIIIIIIIII" },
-        { "a": "eth(user)",  "s":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" },
+        { "a": "eth (user)",  "s":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" },
         { "a": "101domain", "s":"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" },     
         { "a": "GitHub.com (username)", "s":"DDDDDDDDDDDDDDDD" },
         { "a": "ethcrash (Eg5G7yeEmC)", "s":"KJIWCVS3KBEFQXSVKQUHAMDGLY2HW3DDJQRTO5BQJRBUYNSGHRCA" },
@@ -68,6 +68,18 @@ function import2FA(encrypted, secretKey)
 }
 
 function showPasskeyPopup(callback) {
+    // Check for locally-stored passkey first.
+    if (sessionStorage.getItem('Ultra2FA.passkey-ttl') >= Date.now()) {
+        const passkey = sessionStorage.getItem('Ultra2FA.passkey');
+        if (passkey !== null) {
+            callback(passkey);
+
+            return;
+        }
+    // } else {
+    //     $('#filter').val(sessionStorage.getItem('Ultra2FA.passkey-ttl') + ' >= ' + Date.now())
+    }
+
     // Show the popup and overlay
     $('#passkey-popup-overlay').fadeIn();
     $('#passkey-popup').fadeIn();
@@ -78,6 +90,10 @@ function showPasskeyPopup(callback) {
 
         // Get the passkey from the input field
         const passkey = $('#passkey').val();
+
+        // Cache the passkey.
+        sessionStorage.setItem('Ultra2FA.passkey-ttl', Date.now() + 7_200_000);
+        sessionStorage.setItem('Ultra2FA.passkey', passkey);
 
         // Execute the callback function with the passkey
         callback(passkey);
@@ -174,5 +190,4 @@ function showFileUploadPopup(callback)
 export { 
     import2FA, download2FA, load2FA, 
     decrypt2FA, encrypt2FA,
-    showPasskeyPopup,
 };

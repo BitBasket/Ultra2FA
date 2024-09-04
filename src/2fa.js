@@ -66,7 +66,7 @@ function encrypt2FA(text, secretKey)
     const encrypted = CryptoJS.AES.encrypt(text, secretKey).toString();
     console.log(encrypted);
 
-    return encrypted;
+    return encrypted.toString(CryptoJS.enc.Utf8);
 }
 
 function import2FA(encrypted, secretKey)
@@ -76,12 +76,24 @@ function import2FA(encrypted, secretKey)
     return decrypted;
 }
 
-function showPasskeyPopup(callback) {
+function cachePasskey(passkey)
+{
+    // Cache the passkey.
+    sessionStorage.setItem('Ultra2FA.passkey-ttl', Date.now() + 7_200_000);
+    sessionStorage.setItem('Ultra2FA.passkey', passkey);    
+}
+
+function showPasskeyPopup(callback, getNewPasskey = false) {
     // Check for locally-stored passkey first.
-    if (sessionStorage.getItem('Ultra2FA.passkey-ttl') >= Date.now()) {
+    if (getNewPasskey === false && sessionStorage.getItem('Ultra2FA.passkey-ttl') >= Date.now()) {
         const passkey = sessionStorage.getItem('Ultra2FA.passkey');
         if (passkey !== null) {
-            callback(passkey);
+            try {
+                callback(passkey);
+            }
+            catch (Error) {
+                showPasskeyPopup(callback, true);
+            }
 
             return;
         }

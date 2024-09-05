@@ -16,18 +16,47 @@
         </div>
     </header>
     <main>
-        <section id="tokens" class="token-container">
+        <section class="token-container" id="tokens">
+            <div class="token-wrapper">
+            </div>
         </section>
         <section id="controls">
+            <button id="settings-btn">Settings</button>
             <button id="export-btn">Change Passkey + Export</button>
-            <div id="passkey-popup-overlay"></div>
+            <button id="add-btn">Add</button>
+        </section>
+        <section id="overlays">
+            <!-- Add Account Popup -->
+            <div class="overlay" id="add-account-popup-overlay"></div>
+
+            <div class="popup" id="add-account-popup">
+                <form id="add-account-form">
+                    <div class="input-row">
+                        <div style="flex: 1;">
+                            <label for="account-1">Account</label>
+                            <input type="text" id="account-1" name="account[]">
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="secret-1">Secret</label>
+                            <input type="text" id="secret-1" name="secret[]">
+                        </div>
+                        <button type="button" id="add-row-btn"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="additional-rows"></div>
+                    <div class="popup-actions">
+                        <button type="submit" id="add-account">Add</button>
+                        <button type="button" class="cancel">Cancel</button>
+                    </div>
+                    <div class="error-message" id="error-message"></div>
+                </form>
+            </div>
 
             <div class="overlay" id="passkey-popup-overlay"></div>
             <div class="popup" id="passkey-popup">
                 <form id="passkey-form">
                     <label for="passkey">Enter your passkey:</label>
                     <div class="error-message" style="display: block"></div>
-                    <input type="password" id="passkey" name="passkey" required>
+                    <input type="password" id="passkey" name="passkey" required="required" autofocus="autofocus"/>
                     <button type="submit">Submit</button>
                 </form>
             </div>

@@ -1,6 +1,7 @@
 // Import jQuery from node_modules
 import $ from 'jquery';
 import * as TwoFA from './2fa.js';
+import './add-account.js';
 
 $(function () {
     TwoFA.load2FA();

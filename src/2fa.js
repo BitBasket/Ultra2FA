@@ -154,6 +154,7 @@ function showPasskeyPopup(callback, getNewPasskey = false) {
 
     // Close the popup when the overlay is clicked
     $('#passkey-popup-overlay').off('click').on('click', function() {
+
         $('#passkey-popup').fadeOut();
         $('#passkey-popup-overlay').fadeOut();
     });

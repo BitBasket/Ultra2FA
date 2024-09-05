@@ -66,6 +66,7 @@ h1,  h2, h3, h4, h5 {
 
 .token-name {
     font-weight: bold;
+    text-align: left;
 }
 
 .token-code {

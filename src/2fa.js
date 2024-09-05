@@ -216,12 +216,6 @@ function showFileUploadPopup(callback)
                 alert('Please select a valid .aes file.');
             }
         });
-
-        // Close the popup when the overlay is clicked
-        $('#file-upload-popup-overlay').off('click').on('click', function() {
-            $('#file-upload-popup').fadeOut();
-            $('#file-upload-popup-overlay').fadeOut();
-        });
     });
 }
 

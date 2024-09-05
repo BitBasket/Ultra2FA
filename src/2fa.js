@@ -4,11 +4,20 @@ import * as otplib from 'otplib';
 
 // Show the popup when the Export button is clicked
 $('#export-btn').on('click', () => {
+    // Always ask for a new passkey.
+    const $passkeyLabel = $('#passkey-popup label');
+    const passkeyLabelText = $passkeyLabel.text();
+    $passkeyLabel.text('Enter your new passkey');
     showPasskeyPopup(async passkey => {
         const accounts = await download2FA();
-        const encrypted = encrypt2FA(JSON.stringify(accounts), passkey);
-        downloadExportFile('ultra-2fa.secrets.json.aes', encrypted.toString(CryptoJS.enc.Utf8))
-    });
+
+        const encrypted2FAData = encrypt2FA(JSON.stringify(accounts), passkey);
+        downloadExportFile('ultra-2fa.secrets.json.aes', encrypted2FAData)
+        $passkeyLabel.text(passkeyLabelText);
+
+        localStorage.setItem('Ultra2FA.encrypted-data', fileContent)
+
+    }, true);
 });
 
 function generateOTPCode(secret)
@@ -47,16 +56,25 @@ function download2FA()
         }
 
         let accounts;
-        showPasskeyPopup(passkey => {
-            try {
-                data = import2FA(encrypted2FAData, passkey);
-                accounts = JSON.parse(data);
-            } catch (e) {
-                throw new Error("Invalid passkey / encrypted data:" + e);
-            }
+        try {
+            showPasskeyPopup(passkey => {
+                try {
+                    data = import2FA(encrypted2FAData, passkey);
+                    accounts = JSON.parse(data);
+                } catch (e) {
+                    throw new Error("Invalid passkey / encrypted data:" + e);
+                }
 
-            resolve(accounts);
-        });
+                resolve(accounts);
+            });
+        } catch (
+            e) {
+            // Invalidate the cached passkey.
+            sessionStorage.removeItem('Ultra2F.passkey');
+            sessionStorage.removeItem('Ultra2F.passkey-ttl');
+
+            throw e;
+        }
     });
 }
 
@@ -111,13 +129,17 @@ function showPasskeyPopup(callback, getNewPasskey = false) {
 
         // Get the passkey from the input field
         const passkey = $('#passkey').val();
+        cachePasskey(passkey);
 
-        // Cache the passkey.
-        sessionStorage.setItem('Ultra2FA.passkey-ttl', Date.now() + 7_200_000);
-        sessionStorage.setItem('Ultra2FA.passkey', passkey);
+        try {
+            // Execute the callback function with the passkey
+            callback(passkey);
+        } catch (Error) {
+            $('.error-message').text('Incorrect passkey.');
+            $('.error-message').css('visibility', 'visible');
 
-        // Execute the callback function with the passkey
-        callback(passkey);
+            return;
+        }
 
         // Clear the input field (optional)
         $('#passkey').val('');

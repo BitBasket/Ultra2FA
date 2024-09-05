@@ -122,6 +122,7 @@ function showPasskeyPopup(callback, getNewPasskey = false) {
     // Show the popup and overlay
     $('#passkey-popup-overlay').fadeIn();
     $('#passkey-popup').fadeIn();
+    $('#passkey-popup').find('input[type=password]').trigger('focus');
 
     // Handle form submission
     $('#passkey-form').off('submit').on('submit', (event) => {
@@ -135,14 +136,16 @@ function showPasskeyPopup(callback, getNewPasskey = false) {
             // Execute the callback function with the passkey
             callback(passkey);
         } catch (Error) {
-            $('.error-message').text('Incorrect passkey.');
-            $('.error-message').css('visibility', 'visible');
+            $('.error-message').text('Incorrect passkey.')
+                .css('visibility', 'visible');
 
             return;
         }
 
         // Clear the input field (optional)
         $('#passkey').val('');
+        $('.error-message').text('')
+            .css('visibility', 'hidden');
 
         // Hide the popup
         $('#passkey-popup').fadeOut();

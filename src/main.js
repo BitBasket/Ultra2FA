@@ -19,3 +19,9 @@ $(function () {
         });
     });
 });
+
+$('.popup .cancel').on('click', function() {
+    $('.overlay').fadeOut();
+    $('.popup').fadeOut();
+    $('.error-message').hide(); // Hide error message
+});

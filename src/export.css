@@ -1,14 +1,31 @@
-/* Basic styling for the button and popup */
-#export-btn {
-    background-color: green;
-    color: white;
+/* Controls Section */
+#controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#controls button {
+    background-color: #666;
     padding: 10px 20px;
     border: none;
     cursor: pointer;
     font-size: 16px;
+    margin: 0;
+    color: white;
+    border-radius: 8px;
 }
 
-#passkey-popup {
+#add-btn {
+    background-color: red !important;
+}
+
+section#controls #export-btn {
+    background-color: green;
+}
+
+/* Generic Popup Styling */
+.popup {
     display: none; /* Initially hidden */
     position: fixed;
     top: 50%;
@@ -19,9 +36,10 @@
     padding: 20px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     z-index: 1000;
+    width: 400px;
 }
 
-#passkey-popup-overlay {
+.overlay {
     display: none; /* Initially hidden */
     position: fixed;
     top: 0;
@@ -32,14 +50,18 @@
     z-index: 999;
 }
 
-#passkey-popup input[type="password"] {
+/* Input Fields */
+.popup input[type="password"],
+.popup input[type="file"],
+.popup input[type="text"] {
     padding: 8px;
     font-size: 14px;
     width: 100%;
     margin-bottom: 10px;
 }
 
-#passkey-popup button {
+/* Buttons Inside Popup */
+.popup button {
     padding: 10px 20px;
     background-color: green;
     color: white;
@@ -48,56 +70,63 @@
     font-size: 16px;
 }
 
-/* Basic styling for the button and popup */
-#upload-btn {
+/* Input Row Specific Styling */
+.input-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.input-row label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.input-row input {
+    margin-right: 10px;
+    flex: 1;
+}
+
+.input-row button {
     background-color: green;
     color: white;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+}
+
+/* Error Message Styling */
+.error-message {
+    background-color: red;
+    color: white;
+    padding: 5px;
+    margin-top: 10px;
+    visibility: hidden;
+    min-height: 1em;
+}
+
+/* Popup Actions Buttons */
+.popup-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.popup-actions button {
     padding: 10px 20px;
     border: none;
     cursor: pointer;
     font-size: 16px;
 }
 
-#file-upload-popup {
-    display: none; /* Initially hidden */
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+#add-account {
+    background-color: blue;
+    color: white;
+}
+
+button.cancel {
     background-color: white;
     color: black;
-    padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-}
-
-#file-upload-popup label {
-    font-size: 77%;
-}
-
-#file-upload-popup-overlay {
-    display: none; /* Initially hidden */
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-}
-
-#file-upload-popup input[type="file"] {
-    padding: 8px;
-    font-size: 14px;
-    width: 100%;
-    margin-bottom: 10px;
-}
-
-#file-upload-popup button {
-    padding: 10px 20px;
-    background-color: green;
-    color: black;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
+    border: 1px solid black;
 }

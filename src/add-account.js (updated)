@@ -1,0 +1,130 @@
+// ==== ./src/add-account.js (updated) ====
+import $ from 'jquery';
+import { saveEncryptedData, getEncryptedData } from './storage.js';
+import { encryptAccounts, decryptAccounts } from './crypto.js';
+import { showPasskeyPopup } from './ui/popups.js';
+import { addTokenToDisplay } from './ui/tokens.js';
+import { MESSAGES } from './constants.js';
+
+let rowCount = 1;
+
+$(function() {
+  setupAddAccountHandlers();
+});
+
+function setupAddAccountHandlers() {
+  $('#add-btn').on('click', showAddAccountPopup);
+  $('#add-row-btn').on('click', addNewRow);
+  $('#add-account-form').on('submit', handleAddAccount);
+}
+
+function showAddAccountPopup() {
+  $('#add-account-popup-overlay').fadeIn();
+  $('#add-account-popup').fadeIn();
+  $('#account-1').trigger('focus');
+}
+
+function addNewRow() {
+  rowCount++;
+  const newRow = `
+    <div class="input-row" id="row-${rowCount}">
+      <div style="flex: 1;">
+        <label for="account-${rowCount}">Account</label>
+        <input type="text" id="account-${rowCount}" name="account[]">
+      </div>
+      <div style="flex: 1;">
+        <label for="secret-${rowCount}">Secret</label>
+        <input type="text" id="secret-${rowCount}" name="secret[]">
+      </div>
+      <button type="button" class="remove-row-btn" data-row="${rowCount}">
+        <i class="fas fa-minus"></i>
+      </button>
+    </div>
+  `;
+  
+  $('#additional-rows').append(newRow);
+  
+  // Bind remove button for the new row
+  $(`#row-${rowCount} .remove-row-btn`).on('click', function() {
+    const rowId = $(this).data('row');
+    $(`#row-${rowId}`).remove();
+  });
+}
+
+async function handleAddAccount(event) {
+  event.preventDefault();
+  
+  try {
+    // Collect new accounts from form
+    const newAccounts = collectAccountsFromForm();
+    
+    if (newAccounts.length === 0) {
+      showAddAccountError('Please enter at least one account.');
+      return;
+    }
+    
+    // Get passkey (will use cached if available)
+    const passkey = await showPasskeyPopup(p => {
+      if (!p || p.trim() === '') {
+        throw new Error(MESSAGES.EMPTY_PASSKEY);
+      }
+    });
+    
+    // Get existing accounts
+    const encryptedData = getEncryptedData();
+    const existingAccounts = encryptedData 
+      ? decryptAccounts(encryptedData, passkey)
+      : [];
+    
+    // Combine accounts
+    const allAccounts = [...existingAccounts, ...newAccounts];
+    
+    // Save encrypted accounts
+    const newEncryptedData = encryptAccounts(allAccounts, passkey);
+    saveEncryptedData(newEncryptedData);
+    
+    // Update display
+    newAccounts.forEach(account => addTokenToDisplay(account));
+    
+    // Close popup and reset form
+    closeAddAccountPopup();
+    resetAddAccountForm();
+    
+  } catch (error) {
+    console.error('Failed to add account:', error);
+    showAddAccountError('Failed to add account. Please check your passkey.');
+  }
+}
+
+function collectAccountsFromForm() {
+  const accounts = [];
+  const accountInputs = $('input[name="account[]"]');
+  const secretInputs = $('input[name="secret[]"]');
+  
+  accountInputs.each(function(index) {
+    const accountName = $(this).val().trim();
+    const secret = $(secretInputs[index]).val().trim();
+    
+    if (accountName && secret) {
+      accounts.push({ a: accountName, s: secret });
+    }
+  });
+  
+  return accounts;
+}
+
+function showAddAccountError(message) {
+  $('#error-message').text(message).show();
+}
+
+function closeAddAccountPopup() {
+  $('#add-account-popup').fadeOut();
+  $('#add-account-popup-overlay').fadeOut();
+}
+
+function resetAddAccountForm() {
+  $('#add-account-form')[0].reset();
+  $('#additional-rows').empty();
+  $('#error-message').hide();
+  rowCount = 1;
+}

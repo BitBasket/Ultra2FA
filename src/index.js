@@ -1,4 +1,4 @@
-// ==== ./src/main.js ====
+// ==== ./src/index.js ====
 import $ from 'jquery';
 import { initializeApp } from './app.js';
 

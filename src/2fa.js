@@ -1,23 +1,42 @@
+// ==== ./src/2fa.js ====
 import CryptoJS, { enc } from 'crypto-js';
 import $ from 'jquery';
 import * as otplib from 'otplib';
 
 // Show the popup when the Export button is clicked
-$('#export-btn').on('click', () => {
+$('#export-btn').on('click', async () => { // Make event handler async
     // Always ask for a new passkey.
     const $passkeyLabel = $('#passkey-popup label');
-    const passkeyLabelText = $passkeyLabel.text();
-    $passkeyLabel.text('Enter your new passkey');
-    showPasskeyPopup(async passkey => {
+    const originalPasskeyLabelText = $passkeyLabel.text(); // Store original text
+    $passkeyLabel.text('Enter your new passkey'); // Update label for export context
+
+    try {
+        // Await the passkey from the popup for export.
+        // For export, we just need a non-empty passkey, no decryption needed here.
+        const exportPasskey = await showPasskeyPopup(p => {
+            if (!p || p.trim() === '') {
+                throw new Error("Passkey cannot be empty for export.");
+            }
+        }, true); // `getNewPasskey = true` to force new input.
+
+        // Now, download the existing 2FA accounts (this might trigger another passkey popup
+        // if the current session passkey is expired or invalid for the stored data).
         const accounts = await download2FA();
 
-        const encrypted2FAData = encrypt2FA(JSON.stringify(accounts), passkey);
-        downloadExportFile('ultra-2fa.secrets.json.aes', encrypted2FAData)
-        $passkeyLabel.text(passkeyLabelText);
+        // Encrypt the accounts with the *newly provided export passkey*
+        const encrypted2FAData = encrypt2FA(JSON.stringify(accounts), exportPasskey);
+        downloadExportFile('ultra-2fa.secrets.json.aes', encrypted2FAData);
 
-        localStorage.setItem('Ultra2FA.encrypted-data', fileContent)
+        // This line `localStorage.setItem('Ultra2FA.encrypted-data', fileContent)`
+        // was misplaced and `fileContent` was undefined in this context. Removed.
 
-    }, true);
+    } catch (error) {
+        console.error("Export operation cancelled or failed:", error);
+        // Optionally show a user-friendly error message or alert
+        alert("Export cancelled or failed: " + error.message);
+    } finally {
+        $passkeyLabel.text(originalPasskeyLabelText); // Restore original label text
+    }
 });
 
 function generateOTPCode(secret)
@@ -27,55 +46,77 @@ function generateOTPCode(secret)
 
 async function load2FA()
 {
-    const accounts = await download2FA();
-    accounts.forEach((account) => {
-        const token = generateOTPCode(account.s);
+    try {
+        const accounts = await download2FA();
+        // Clear existing tokens before adding new ones, to prevent duplicates on re-load
+        $('.token-container').empty();
+        accounts.forEach((account) => {
+            const token = generateOTPCode(account.s);
 
-        const tokenDiv  = $('<div class="token"></div>');
-        const tokenName = $('<span class="token-name"></span>').text(account.a);
-        const tokenCode = $('<span class="token-code"></span>').text(token);
-        tokenDiv.append(tokenName).append(tokenCode);
+            const tokenDiv  = $('<div class="token"></div>');
+            const tokenName = $('<span class="token-name"></span>').text(account.a);
+            const tokenCode = $('<span class="token-code"></span>').text(token);
+            tokenDiv.append(tokenName).append(tokenCode);
 
-        $('.token-container').append(tokenDiv);
-    });
+            $('.token-container').append(tokenDiv);
+        });
+    } catch (error) {
+        console.error("Failed to load 2FA accounts:", error);
+        alert("Failed to load 2FA accounts. Please try again or re-upload your secrets file.");
+        // If initial load fails completely (e.g. user dismisses file upload or passkey repeatedly),
+        // we might want to clear local storage again, or show a more persistent error state.
+    }
 }
 
-function download2FA()
+// Make download2FA an async function that returns the accounts
+async function download2FA()
 {
-    return new Promise(async (resolve, reject) => {
-        let encrypted2FAData = localStorage.getItem('Ultra2FA.encrypted-data');
-        if (encrypted2FAData === null) {
-            // Bootstrap: Uncomment and comment the showFileUploadPopup().
-            // encrypted2FAData = 'U2FsdGVkX1+wKbXcRa4NkpedSum+gc7vmfujLDNCiqdgJ4V2itOF09xYyD1W7NUIoIBhoyuB3SKS6EWRujB2yl4FNk6SUQXRuresjPCw5fyZdt6kUh0InAAsSApvGuhz3z29nN5qEPLUSNG3p7QslAg7+Q/8S6mieYqnOnRA+bwfW5jYOhDVKX2pl9N+ntR8zn4JUNG4KOF8Xp8rtpSlMAicllSKf76iusB4M5i6LIh50DQnj53S9qva4/PA3fZhHRoey5tcAF0FjBhjQhb+e1TR3fPn3JXFVSX7mKpzVI74B9zMuk3EO1gwvQKGWfFF6U4bznC07xv9DuvSTrzEVzkZVFMEfvWk4aMH9iWzEYeXYViBZTRiYZ/tEFYPMucwrm3qTM0KCeXqNMius/wDhBjBiNQZMRuWALPefLhzhh0Qu2qTXpSioAf5iNIA3ocfbJBaea3JvVKh0qEFwK4hK9zVaL10dpitGz38VClguRFraUbk1J/LhTn5lRjregOAf9QRrlmVKYJUHZASyeqQ2ntzclmAUbhhdNfIzIU672XSZmxSJWzDtPD1Y53fx8MGQ8Wsh7aIO1r/5lIvDv9waeClQQqwqz9saCofPPvWj5E=';
-            encrypted2FAData = await showFileUploadPopup()
-                .then((fileContent) => {
-                    // Store indefinitely in localStorage.
-                    localStorage.setItem('Ultra2FA.encrypted-data', fileContent)
-                    return fileContent;
-                });
-        }
+    let encrypted2FAData = localStorage.getItem('Ultra2FA.encrypted-data');
 
-        let accounts;
+    // If no encrypted data is found, prompt for file upload
+    if (encrypted2FAData === null) {
         try {
-            showPasskeyPopup(passkey => {
-                try {
-                    data = import2FA(encrypted2FAData, passkey);
-                    accounts = JSON.parse(data);
-                } catch (e) {
-                    throw new Error("Invalid passkey / encrypted data:" + e);
-                }
+            encrypted2FAData = await showFileUploadPopup();
+            // Store indefinitely in localStorage after successful upload
+            localStorage.setItem('Ultra2FA.encrypted-data', encrypted2FAData);
+        } catch (error) {
+            // If file upload is dismissed or fails, we cannot proceed.
+            throw new Error("File upload required to proceed: " + error.message);
+        }
+    }
 
-                resolve(accounts);
-            });
-        } catch (
-            e) {
-            // Invalidate the cached passkey.
-            sessionStorage.removeItem('Ultra2F.passkey');
-            sessionStorage.removeItem('Ultra2F.passkey-ttl');
+    let accounts;
+    try {
+        // Await the passkey from the popup. The callback will handle decryption/parsing.
+        await showPasskeyPopup(p => {
+            try {
+                const data = import2FA(encrypted2FAData, p);
+                accounts = JSON.parse(data); // Assigns to accounts from outer scope
+            } catch (e) {
+                throw new Error("Invalid passkey / encrypted data."); // This error is caught by showPasskeyPopup's internal catch
+            }
+        });
 
+        // If we reach here, accounts have been successfully loaded and parsed.
+        return accounts;
+    } catch (e) {
+        // This catch block handles rejections from showPasskeyPopup (dismissal or failure)
+
+        // Invalidate any cached passkey, as it failed or was dismissed.
+        sessionStorage.removeItem('Ultra2FA.passkey');
+        sessionStorage.removeItem('Ultra2FA.passkey-ttl');
+
+        // Check if the dismissal happened after an incorrect attempt for existing data
+        if (e.message === "Passkey entry dismissed after incorrect attempt." && localStorage.getItem('Ultra2FA.encrypted-data') !== null) {
+            // Remove the problematic encrypted data from localStorage
+            localStorage.removeItem('Ultra2FA.encrypted-data');
+            // Recursively call download2FA, which will now trigger showFileUploadPopup
+            return await download2FA();
+        } else {
+            // For other errors (e.g., general dismissal), re-throw
             throw e;
         }
-    });
+    }
 }
 
 function encrypt2FA(text, secretKey)
@@ -83,80 +124,104 @@ function encrypt2FA(text, secretKey)
     // Encrypt the JSON string using AES-256
     const encrypted = CryptoJS.AES.encrypt(text, secretKey).toString();
     console.log(encrypted);
-
-    return encrypted.toString(CryptoJS.enc.Utf8);
+    return encrypted;
 }
 
 function import2FA(encrypted, secretKey)
 {
     const decrypted = CryptoJS.AES.decrypt(encrypted, secretKey).toString(CryptoJS.enc.Utf8);
-
+    // If decryption fails, toString(Utf8) might return an empty string or throw depending on CryptoJS version/error handling.
+    // It's safer to ensure non-empty before JSON.parse.
+    if (!decrypted) {
+        throw new Error("Decryption resulted in empty data.");
+    }
     return decrypted;
 }
 
 function cachePasskey(passkey)
 {
-    // Cache the passkey.
+    // Cache the passkey. TTL is 2 hours.
     sessionStorage.setItem('Ultra2FA.passkey-ttl', Date.now() + 7_200_000);
-    sessionStorage.setItem('Ultra2FA.passkey', passkey);    
+    sessionStorage.setItem('Ultra2FA.passkey', passkey);
 }
 
-function showPasskeyPopup(callback, getNewPasskey = false) {
-    // Check for locally-stored passkey first.
-    if (getNewPasskey === false && sessionStorage.getItem('Ultra2FA.passkey-ttl') >= Date.now()) {
-        const passkey = sessionStorage.getItem('Ultra2FA.passkey');
-        if (passkey !== null) {
+/**
+ * Shows the passkey entry popup and returns a Promise.
+ * The promise resolves with the passkey on success, or rejects on dismissal/failure.
+ * @param {function(string): void} decryptAndValidateCallback - A function that attempts decryption/validation. It should throw on failure.
+ * @param {boolean} getNewPasskey - If true, always show the popup, ignoring cached passkey.
+ * @returns {Promise<string>} A promise that resolves with the passkey or rejects with an Error.
+ */
+function showPasskeyPopup(decryptAndValidateCallback, getNewPasskey = false) {
+    return new Promise((resolve, reject) => {
+        const $passkeyPopup = $('#passkey-popup');
+        const $passkeyPopupOverlay = $('#passkey-popup-overlay');
+        const $passkeyInput = $('#passkey');
+        const $errorMessage = $('.error-message');
+        const $passkeyForm = $('#passkey-form'); // Reference the form
+
+        // Reset state
+        $errorMessage.text('').css('visibility', 'hidden');
+        $passkeyInput.val('');
+
+        let incorrectPasskeyAttempted = false; // Flag to track if error message was shown
+
+        // Attempt cached passkey first if not explicitly asking for a new one
+        if (getNewPasskey === false && sessionStorage.getItem('Ultra2FA.passkey-ttl') >= Date.now()) {
+            const cachedPasskey = sessionStorage.getItem('Ultra2FA.passkey');
+            if (cachedPasskey !== null) {
+                try {
+                    decryptAndValidateCallback(cachedPasskey); // Try with cached passkey
+                    cachePasskey(cachedPasskey); // Re-cache to update TTL if successful
+                    resolve(cachedPasskey); // Resolve if cached passkey works
+                    return; // Exit, no need to show popup
+                } catch (e) {
+                    // Cached passkey failed, proceed to show popup and ask for new one.
+                    // This is not an "incorrect passkey" visible error yet, so `incorrectPasskeyAttempted` remains false.
+                    console.warn("Cached passkey invalid or expired, prompting for new.", e);
+                    // Fall through to show the actual popup
+                }
+            }
+        }
+
+        // Show the popup
+        $passkeyPopupOverlay.fadeIn();
+        $passkeyPopup.fadeIn();
+        $passkeyInput.trigger('focus');
+
+        // Handle form submission
+        $passkeyForm.off('submit').on('submit', (event) => { // Bind to the form for submission
+            event.preventDefault();
+            const enteredPasskey = $passkeyInput.val();
+
             try {
-                callback(passkey);
+                decryptAndValidateCallback(enteredPasskey); // Attempt decryption/validation
+                cachePasskey(enteredPasskey); // Cache the *correct* passkey
+                // On success, close popup and resolve
+                $passkeyInput.val('');
+                $errorMessage.text('').css('visibility', 'hidden');
+                $passkeyPopup.fadeOut();
+                $passkeyPopupOverlay.fadeOut();
+                resolve(enteredPasskey);
+            } catch (e) {
+                // On failure, display error and keep popup open
+                $errorMessage.text(e.message || 'Incorrect passkey.').css('visibility', 'visible'); // Use error message from callback
+                incorrectPasskeyAttempted = true; // Mark that an incorrect attempt happened
             }
-            catch (Error) {
-                showPasskeyPopup(callback, true);
+        });
+
+        // Handle popup closing (overlay click)
+        $passkeyPopupOverlay.off('click').on('click', () => {
+            $passkeyPopup.fadeOut();
+            $passkeyPopupOverlay.fadeOut();
+            // Reject if the popup was closed after an incorrect attempt,
+            // otherwise, a general dismissal error.
+            if (incorrectPasskeyAttempted) {
+                reject(new Error("Passkey entry dismissed after incorrect attempt."));
+            } else {
+                reject(new Error("Passkey entry dismissed by user."));
             }
-
-            return;
-        }
-    // } else {
-    //     $('#filter').val(sessionStorage.getItem('Ultra2FA.passkey-ttl') + ' >= ' + Date.now())
-    }
-
-    // Show the popup and overlay
-    $('#passkey-popup-overlay').fadeIn();
-    $('#passkey-popup').fadeIn();
-    $('#passkey-popup').find('input[type=password]').trigger('focus');
-
-    // Handle form submission
-    $('#passkey-form').off('submit').on('submit', (event) => {
-        event.preventDefault();
-
-        // Get the passkey from the input field
-        const passkey = $('#passkey').val();
-        cachePasskey(passkey);
-
-        try {
-            // Execute the callback function with the passkey
-            callback(passkey);
-        } catch (Error) {
-            $('.error-message').text('Incorrect passkey.')
-                .css('visibility', 'visible');
-
-            return;
-        }
-
-        // Clear the input field (optional)
-        $('#passkey').val('');
-        $('.error-message').text('')
-            .css('visibility', 'hidden');
-
-        // Hide the popup
-        $('#passkey-popup').fadeOut();
-        $('#passkey-popup-overlay').fadeOut();
-    });
-
-    // Close the popup when the overlay is clicked
-    $('#passkey-popup-overlay').off('click').on('click', function() {
-
-        $('#passkey-popup').fadeOut();
-        $('#passkey-popup-overlay').fadeOut();
+        });
     });
 }
 
@@ -170,59 +235,66 @@ function downloadExportFile(filename, text) {
     document.body.removeChild(link);
 }
 
-function showFileUploadPopup(callback)
+/**
+ * Shows the file upload popup and returns a Promise.
+ * The promise resolves with the file content on successful upload, or rejects on dismissal/failure.
+ * @returns {Promise<string>} A promise that resolves with the file content as text.
+ */
+function showFileUploadPopup()
 {
     return new Promise((resolve, reject) => {
+        const $fileUploadPopup = $('#file-upload-popup');
+        const $fileUploadPopupOverlay = $('#file-upload-popup-overlay');
+        const $fileInput = $('#file-upload');
+        const $fileUploadForm = $('#file-upload-form');
+
         // Show the popup and overlay
-        $('#file-upload-popup-overlay').fadeIn();
-        $('#file-upload-popup').fadeIn();
+        $fileUploadPopupOverlay.fadeIn();
+        $fileUploadPopup.fadeIn();
 
         // Handle form submission
-        $('#file-upload-form').off('submit').on('submit', function(event) {
+        $fileUploadForm.off('submit').on('submit', function(event) {
             event.preventDefault();
 
-            // Get the selected file
-            const fileInput = $('#file-upload')[0];
-            const file = fileInput.files[0];
+            const file = $fileInput[0].files[0];
 
-            // Check if a file was selected and if it has the correct .aes extension
             if (file && file.name.endsWith('.aes')) {
-                // Execute the callback function with the file
-
-                // Read the file contents
                 const reader = new FileReader();
+
                 reader.onload = function(event) {
                     try {
                         const fileContent = event.target.result;
-
+                        $fileInput.val(''); // Clear file input field
+                        $fileUploadPopup.fadeOut(); // Close popup
+                        $fileUploadPopupOverlay.fadeOut();
                         resolve(fileContent);
-
-                        // Remove popup after successful upload
-                        $('#fileUploadPopup').remove();
                     } catch (error) {
-                        throw new Error("File reading failed.");
+                        // Error during processing read file content
+                        alert("Error processing file: " + error.message);
+                        reject(new Error("File processing failed: " + error.message));
                     }
                 };
 
                 reader.onerror = function() {
-                    throw new Error("File reading failed.");
+                    alert("Error reading file.");
+                    reject(new Error("File reading failed."));
                 };
 
                 reader.readAsText(file);
-
-                // Clear the file input field (optional)
-                fileInput.value = '';
-
-                // Hide the popup
-                $('#file-upload-popup').fadeOut();
-                $('#file-upload-popup-overlay').fadeOut();
             } else {
                 alert('Please select a valid .aes file.');
             }
         });
+
+        // Close the popup when the overlay is clicked and reject the promise
+        $fileUploadPopupOverlay.off('click').on('click', function() {
+            $fileUploadPopup.fadeOut();
+            $fileUploadPopupOverlay.fadeOut();
+            reject(new Error("File upload dismissed by user."));
+        });
     });
 }
 
-export { 
+export {
     load2FA
 };

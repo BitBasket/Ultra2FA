@@ -4,38 +4,34 @@ import $ from 'jquery';
 import * as otplib from 'otplib';
 
 // Show the popup when the Export button is clicked
-$('#export-btn').on('click', async () => { // Make event handler async
+$('#export-btn').on('click', async () => {
     // Always ask for a new passkey.
     const $passkeyLabel = $('#passkey-popup label');
-    const originalPasskeyLabelText = $passkeyLabel.text(); // Store original text
-    $passkeyLabel.text('Enter your new passkey'); // Update label for export context
+    const originalPasskeyLabelText = $passkeyLabel.text();
+    $passkeyLabel.text('Enter your new passkey');
 
     try {
         // Await the passkey from the popup for export.
-        // For export, we just need a non-empty passkey, no decryption needed here.
         const exportPasskey = await showPasskeyPopup(p => {
             if (!p || p.trim() === '') {
                 throw new Error("Passkey cannot be empty for export.");
             }
         }, true); // `getNewPasskey = true` to force new input.
 
-        // Now, download the existing 2FA accounts (this might trigger another passkey popup
-        // if the current session passkey is expired or invalid for the stored data).
-        const accounts = await download2FA();
+        // Now, download the existing 2FA accounts.
+        // If localStorage is empty and a plaintext file is uploaded,
+        // it will reuse the `exportPasskey` to encrypt for local storage.
+        const accounts = await download2FA({ passkeyForNewEncryption: exportPasskey }); // Modified call
 
         // Encrypt the accounts with the *newly provided export passkey*
         const encrypted2FAData = encrypt2FA(JSON.stringify(accounts), exportPasskey);
         downloadExportFile('ultra-2fa.secrets.json.aes', encrypted2FAData);
 
-        // This line `localStorage.setItem('Ultra2FA.encrypted-data', fileContent)`
-        // was misplaced and `fileContent` was undefined in this context. Removed.
-
     } catch (error) {
         console.error("Export operation cancelled or failed:", error);
-        // Optionally show a user-friendly error message or alert
         alert("Export cancelled or failed: " + error.message);
     } finally {
-        $passkeyLabel.text(originalPasskeyLabelText); // Restore original label text
+        $passkeyLabel.text(originalPasskeyLabelText);
     }
 });
 
@@ -69,19 +65,67 @@ async function load2FA()
 }
 
 // Make download2FA an async function that returns the accounts
-async function download2FA()
+async function download2FA(options = {}) // Modified signature
 {
+    // Destructure the options. We'll check if `passkeyForNewEncryption` is provided.
+    const { passkeyForNewEncryption = null } = options;
+
     let encrypted2FAData = localStorage.getItem('Ultra2FA.encrypted-data');
 
     // If no encrypted data is found, prompt for file upload
     if (encrypted2FAData === null) {
         try {
-            encrypted2FAData = await showFileUploadPopup();
-            // Store indefinitely in localStorage after successful upload
-            localStorage.setItem('Ultra2FA.encrypted-data', encrypted2FAData);
+            const fileContent = await showFileUploadPopup();
+
+            try {
+                // Attempt to parse as our plaintext format first.
+                // This will throw an error if the format is wrong.
+                const plaintextAccounts = parsePlaintextSecrets(fileContent);
+                console.log("Plaintext secrets file detected.");
+
+                let passkeyToUseForLocalStorage;
+
+                if (passkeyForNewEncryption) {
+                    // If a passkey was provided (e.g., from an export operation), use it.
+                    console.log("Using provided passkey for local storage encryption from context.");
+                    passkeyToUseForLocalStorage = passkeyForNewEncryption;
+                } else {
+                    // Otherwise, prompt the user for a new passkey to encrypt for local storage.
+                    console.log("Prompting for NEW passkey to encrypt secrets for local storage.");
+                    const $passkeyLabel = $('#passkey-popup label');
+                    const originalPasskeyLabelText = $passkeyLabel.text();
+                    $passkeyLabel.text('Enter a new passkey to encrypt your secrets');
+
+                    try {
+                        passkeyToUseForLocalStorage = await showPasskeyPopup(p => {
+                            if (!p || p.trim() === '') {
+                                throw new Error("Passkey cannot be empty.");
+                            }
+                        }, true); // `getNewPasskey = true` to force new input
+                    } finally {
+                        $passkeyLabel.text(originalPasskeyLabelText);
+                    }
+                }
+
+                // Encrypt the plaintext data (converted back to JSON for internal storage)
+                const newlyEncryptedData = encrypt2FA(JSON.stringify(plaintextAccounts), passkeyToUseForLocalStorage);
+                localStorage.setItem('Ultra2FA.encrypted-data', newlyEncryptedData);
+
+                // Since we have the accounts, we can return them directly.
+                return plaintextAccounts;
+
+            } catch (parsingError) {
+                // parsePlaintextSecrets failed, so we assume it's the encrypted format.
+                console.log("File is not in 'name:secret' format, assuming encrypted:", parsingError.message);
+                encrypted2FAData = fileContent;
+                // Store indefinitely in localStorage after successful upload
+                localStorage.setItem('Ultra2FA.encrypted-data', encrypted2FAData);
+                // The rest of the function will now proceed to decrypt this data.
+            }
+
         } catch (error) {
             // If file upload is dismissed or fails, we cannot proceed.
-            throw new Error("File upload required to proceed: " + error.message);
+            throw new Error("File upload required to proceed: ".concat(error.message));
         }
     }
 
@@ -117,6 +161,53 @@ async function download2FA()
             throw e;
         }
     }
+}
+
+/**
+ * Parses a multi-line, colon-separated string of 2FA secrets.
+ * Each line should be in the format "Account Name:SECRETKEY".
+ * @param {string} textContent The raw text from the imported file.
+ * @returns {Array<{a: string, s: string}>} An array of account objects.
+ * @throws {Error} If the content is invalid or contains no valid accounts.
+ */
+function parsePlaintextSecrets(textContent) {
+    if (!textContent || typeof textContent !== 'string') {
+        throw new Error("Input content is invalid.");
+    }
+
+    const lines = textContent.split(/\r?\n/); // Handles both Windows and Unix line endings
+    const accounts = [];
+
+    lines.forEach(line => {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') {
+            return; // Skip empty lines
+        }
+
+        const separatorIndex = trimmedLine.indexOf(':');
+
+        // A valid line must have a name (length > 0) and a secret.
+        // So the separator can't be at the beginning or be missing.
+        if (separatorIndex <= 0) {
+            // This line is malformed, so we assume the whole file is not our plaintext format.
+            throw new Error(`Invalid line format: "${trimmedLine}". Expected "name:secret".`);
+        }
+
+        const accountName = trimmedLine.substring(0, separatorIndex).trim();
+        const secret = trimmedLine.substring(separatorIndex + 1).trim();
+
+        if (secret === '') {
+            throw new Error(`Invalid line format: Secret is empty for account "${accountName}".`);
+        }
+
+        accounts.push({ a: accountName, s: secret });
+    });
+
+    if (accounts.length === 0) {
+        throw new Error("No valid accounts found in the file.");
+    }
+
+    return accounts;
 }
 
 function encrypt2FA(text, secretKey)
@@ -258,7 +349,7 @@ function showFileUploadPopup()
 
             const file = $fileInput[0].files[0];
 
-            if (file && file.name.endsWith('.aes')) {
+            if (file) {
                 const reader = new FileReader();
 
                 reader.onload = function(event) {
